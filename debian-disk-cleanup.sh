@@ -223,10 +223,16 @@ user_cache_cleanup() {
 snap_cleanup() {
   if command -v snap >/dev/null 2>&1; then
     print_info "Cleaning disabled snap revisions..."
-    snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}' | while read -r snapname revision; do
+    local disabled_revisions
+    disabled_revisions="$(snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}' || true)"
+    if [[ -z "$disabled_revisions" ]]; then
+      print_info "No disabled snap revisions found."
+      return 0
+    fi
+    while read -r snapname revision; do
       [[ -n "$snapname" && -n "$revision" ]] || continue
       run snap remove "$snapname" "--revision=${revision}" || true
-    done
+    done <<< "$disabled_revisions"
   fi
 }
 

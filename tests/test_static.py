@@ -47,3 +47,7 @@ def test_default_does_not_truncate_active_main_logs():
     ]
     for text in forbidden:
         assert text not in SCRIPT
+
+
+def test_snap_pipeline_is_tolerant_under_pipefail():
+    assert "snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}' || true" in SCRIPT
