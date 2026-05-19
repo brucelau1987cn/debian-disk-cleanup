@@ -18,13 +18,15 @@ def make_fakebin(tmp_path, commands):
     return fakebin, log
 
 
-def run_script(args, tmp_path, commands=None, input_text=None):
+def run_script(args, tmp_path, commands=None, input_text=None, env_overrides=None):
     commands = commands or {}
     fakebin, log = make_fakebin(tmp_path, commands)
     env = os.environ.copy()
     env["PATH"] = f"{fakebin}:{env['PATH']}"
     env["COMMAND_LOG"] = str(log)
     env["DEBIAN_DISK_CLEANUP_TEST_ALLOW_NON_ROOT"] = "1"
+    if env_overrides:
+        env.update(env_overrides)
     result = subprocess.run(
         ["bash", str(SCRIPT), *args],
         input=input_text,
@@ -62,6 +64,16 @@ BASE_COMMANDS = {
     "find": """
         #!/usr/bin/env bash
         echo "find $*" >> "$COMMAND_LOG"
+        exit 0
+    """,
+    "rm": """
+        #!/usr/bin/env bash
+        echo "rm $*" >> "$COMMAND_LOG"
+        exit 0
+    """,
+    "swapon": """
+        #!/usr/bin/env bash
+        echo "swapon $*" >> "$COMMAND_LOG"
         exit 0
     """,
     "uname": """
@@ -115,6 +127,8 @@ def test_explicit_destructive_flags_are_visible_in_dry_run(tmp_path):
             "--clear-tmp",
             "--clear-user-caches",
             "--clear-login-logs",
+            "--clear-apt-lists",
+            "--remove-unused-swap",
             "--prune-volumes",
         ],
         tmp_path,
@@ -123,7 +137,56 @@ def test_explicit_destructive_flags_are_visible_in_dry_run(tmp_path):
     assert result.returncode == 0, result.stderr + result.stdout
     assert "find /tmp /var/tmp" in result.stdout
     assert "bash -c" in result.stdout and "/root/.cache" in result.stdout
+    assert "bash -c rm\\ -rf\\ /var/lib/apt/lists/\\*" in result.stdout
     assert "docker system prune -a --volumes -f" in result.stdout
+
+
+def test_apt_binary_caches_are_safe_default_cleanup(tmp_path):
+    result, _ = run_script(["--dry-run"], tmp_path, BASE_COMMANDS)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "rm -f /var/cache/apt/pkgcache.bin" in result.stdout
+    assert "rm -f /var/cache/apt/srcpkgcache.bin" in result.stdout
+    assert "/var/lib/apt/lists" not in result.stdout
+
+
+def test_clear_apt_lists_requires_explicit_flag(tmp_path):
+    result, _ = run_script(["--dry-run", "--clear-apt-lists"], tmp_path, BASE_COMMANDS)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "/var/lib/apt/lists" in result.stdout
+
+
+def test_remove_unused_swap_requires_explicit_flag_and_safety_checks(tmp_path):
+    swap_file = tmp_path / "swap"
+    swap_file.write_bytes(b"0")
+    result, _ = run_script(
+        ["--dry-run", "--remove-unused-swap"],
+        tmp_path,
+        BASE_COMMANDS,
+        env_overrides={"DEBIAN_DISK_CLEANUP_SWAP_FILE": str(swap_file)},
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert f"[DRY-RUN] rm -f {swap_file}" in result.stdout
+
+
+def test_active_swap_file_is_not_removed(tmp_path):
+    commands = dict(BASE_COMMANDS)
+    swap_file = tmp_path / "swap"
+    swap_file.write_bytes(b"0")
+    commands["swapon"] = """
+        #!/usr/bin/env bash
+        echo "swapon $*" >> "$COMMAND_LOG"
+        echo "$DEBIAN_DISK_CLEANUP_SWAP_FILE"
+        exit 0
+    """
+    result, _ = run_script(
+        ["--dry-run", "--remove-unused-swap"],
+        tmp_path,
+        commands,
+        env_overrides={"DEBIAN_DISK_CLEANUP_SWAP_FILE": str(swap_file)},
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert f"[DRY-RUN] rm -f {swap_file}" not in result.stdout
+    assert "is active. Skipping removal" in result.stdout
 
 
 def test_cancel_confirmation_exits_before_cleanup(tmp_path):

@@ -15,6 +15,8 @@ CLEAR_LOGIN_LOGS=0
 CLEAR_USER_CACHES=0
 CLEAR_TMP=0
 SKIP_DPKG_REPAIR=0
+CLEAR_APT_LISTS=0
+REMOVE_UNUSED_SWAP=0
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -38,6 +40,8 @@ Options:
       --clear-login-logs    Truncate /var/log/btmp and /var/log/wtmp.
       --clear-user-caches   Delete /root/.cache and /home/*/.cache contents.
       --clear-tmp           Delete files under /tmp and /var/tmp.
+      --clear-apt-lists     Delete /var/lib/apt/lists package indexes.
+      --remove-unused-swap  Delete /swap when it is a plain file, inactive, and absent from /etc/fstab.
       --skip-dpkg-repair    Skip automatic 'dpkg --configure -a' preflight repair.
   -h, --help                Show this help.
 
@@ -96,6 +100,8 @@ parse_args() {
       --clear-login-logs) CLEAR_LOGIN_LOGS=1; shift ;;
       --clear-user-caches) CLEAR_USER_CACHES=1; shift ;;
       --clear-tmp) CLEAR_TMP=1; shift ;;
+      --clear-apt-lists) CLEAR_APT_LISTS=1; shift ;;
+      --remove-unused-swap) REMOVE_UNUSED_SWAP=1; shift ;;
       --skip-dpkg-repair) SKIP_DPKG_REPAIR=1; shift ;;
       -h|--help) usage; exit 0 ;;
       *) print_error "Unknown option: $1"; usage; exit 2 ;;
@@ -158,6 +164,42 @@ log_cleanup() {
 cache_cleanup() {
   print_info "Cleaning package cache files under /var/cache..."
   run find /var/cache -type f -name '*.deb' -delete
+
+  for cache_file in /var/cache/apt/pkgcache.bin /var/cache/apt/srcpkgcache.bin; do
+    if [[ -f "$cache_file" ]]; then
+      run rm -f "$cache_file"
+    fi
+  done
+
+  if (( CLEAR_APT_LISTS )); then
+    print_warn "Cleaning APT package indexes under /var/lib/apt/lists. Run apt-get update before installing packages later."
+    run_shell 'rm -rf /var/lib/apt/lists/* && mkdir -p /var/lib/apt/lists/partial'
+  fi
+}
+
+unused_swap_cleanup() {
+  if ! (( REMOVE_UNUSED_SWAP )); then
+    return 0
+  fi
+
+  local swap_file="${DEBIAN_DISK_CLEANUP_SWAP_FILE:-/swap}"
+  if [[ ! -f "$swap_file" ]]; then
+    print_info "No /swap file found."
+    return 0
+  fi
+
+  if swapon --show=NAME --noheadings 2>/dev/null | grep -Fxq "$swap_file"; then
+    print_warn "/swap is active. Skipping removal."
+    return 0
+  fi
+
+  if grep -Eq "^[[:space:]]*[^#].*[[:space:]]${swap_file}[[:space:]]" /etc/fstab 2>/dev/null; then
+    print_warn "/swap is referenced in /etc/fstab. Skipping removal."
+    return 0
+  fi
+
+  print_warn "Removing inactive /swap file..."
+  run rm -f "$swap_file"
 }
 
 tmp_cleanup() {
@@ -265,6 +307,7 @@ main() {
   log_cleanup
   cache_cleanup
   tmp_cleanup
+  unused_swap_cleanup
   kernel_cleanup
   orphan_cleanup
   docker_cleanup

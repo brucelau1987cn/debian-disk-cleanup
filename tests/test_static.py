@@ -21,6 +21,10 @@ def test_destructive_operations_require_flags():
     assert "--clear-login-logs" in SCRIPT
     assert "--clear-user-caches" in SCRIPT
     assert "--clear-tmp" in SCRIPT
+    assert "CLEAR_APT_LISTS=0" in SCRIPT
+    assert "REMOVE_UNUSED_SWAP=0" in SCRIPT
+    assert "--clear-apt-lists" in SCRIPT
+    assert "--remove-unused-swap" in SCRIPT
 
 
 def test_no_broken_true_syntax_from_original_script():
@@ -64,3 +68,16 @@ def test_dpkg_preflight_exists_before_apt_cleanup_call():
     assert "run dpkg --configure -a" in SCRIPT
     assert "--skip-dpkg-repair" in SCRIPT
     assert SCRIPT.index("apt_preflight") < SCRIPT.index("apt_cleanup")
+
+
+def test_unused_swap_cleanup_has_safety_guards():
+    assert "unused_swap_cleanup()" in SCRIPT
+    assert "DEBIAN_DISK_CLEANUP_SWAP_FILE:-/swap" in SCRIPT
+    assert "swapon --show=NAME --noheadings" in SCRIPT
+    assert "grep -Fxq \"$swap_file\"" in SCRIPT
+    assert "grep -Eq \"^[[:space:]]*[^#].*[[:space:]]${swap_file}[[:space:]]\" /etc/fstab" in SCRIPT
+
+
+def test_apt_list_cleanup_warns_to_run_update_later():
+    assert "rm -rf /var/lib/apt/lists/* && mkdir -p /var/lib/apt/lists/partial" in SCRIPT
+    assert "Run apt-get update before installing packages later" in SCRIPT
