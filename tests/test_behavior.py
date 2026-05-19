@@ -65,8 +65,8 @@ BASE_COMMANDS = {
     """,
     "dpkg-query": """
         #!/usr/bin/env bash
-        echo "linux-image-6.1.0-old-amd64"
-        echo "linux-image-6.1.0-current-amd64"
+        echo "ii  linux-image-6.1.0-old-amd64"
+        echo "ii  linux-image-6.1.0-current-amd64"
     """,
     "deborphan": """
         #!/usr/bin/env bash
@@ -94,7 +94,7 @@ def test_dry_run_safe_defaults_do_not_execute_destructive_commands(tmp_path):
     assert result.returncode == 0, result.stderr + result.stdout
     assert "[DRY-RUN] apt-get clean" in result.stdout
     assert "[DRY-RUN] apt-get purge -y linux-image-6.1.0-old-amd64" in result.stdout
-    assert "linux-image-6.1.0-current-amd64" not in result.stdout
+    assert "[DRY-RUN] apt-get purge -y linux-image-6.1.0-current-amd64" not in result.stdout
     assert "docker system prune" not in result.stdout
     assert "Skipping /tmp and /var/tmp cleanup" in result.stdout
     assert "Skipping user cache cleanup" in result.stdout
@@ -143,3 +143,17 @@ def test_snap_list_failure_does_not_abort_cleanup(tmp_path):
     result, _ = run_script(["--dry-run"], tmp_path, commands)
     assert result.returncode == 0, result.stderr + result.stdout
     assert "Disk cleanup finished" in result.stdout
+
+
+def test_kernel_cleanup_ignores_removed_config_only_packages(tmp_path):
+    commands = dict(BASE_COMMANDS)
+    commands["dpkg-query"] = """
+        #!/usr/bin/env bash
+        echo "rc  linux-image-6.1.0-18-cloud-amd64-unsigned"
+        echo "ii  linux-image-6.1.0-18-cloud-amd64"
+        echo "ii  linux-image-6.1.0-current-amd64"
+    """
+    result, _ = run_script(["--dry-run"], tmp_path, commands)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "[DRY-RUN] apt-get purge -y linux-image-6.1.0-18-cloud-amd64" in result.stdout
+    assert "[DRY-RUN] apt-get purge -y linux-image-6.1.0-18-cloud-amd64-unsigned" not in result.stdout

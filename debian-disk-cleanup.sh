@@ -160,7 +160,7 @@ kernel_cleanup() {
   print_info "Cleaning old Debian kernel packages..."
   local current_kernel packages
   current_kernel="$(uname -r)"
-  packages="$(dpkg-query -W -f='${Package}\n' 'linux-image-[0-9]*' 2>/dev/null | grep -Fv "${current_kernel}" || true)"
+  packages="$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'linux-image-[0-9]*' 2>/dev/null | awk '$1 ~ /^ii/ {print $2}' | grep -Fv "${current_kernel}" || true)"
 
   if [[ -z "$packages" ]]; then
     print_info "No old kernel packages found."

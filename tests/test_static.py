@@ -52,3 +52,8 @@ def test_default_does_not_truncate_active_main_logs():
 
 def test_snap_pipeline_is_tolerant_under_pipefail():
     assert "snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}' || true" in SCRIPT
+
+
+def test_kernel_cleanup_only_targets_installed_packages():
+    assert "${db:Status-Abbrev} ${Package}" in SCRIPT
+    assert "awk '$1 ~ /^ii/ {print $2}'" in SCRIPT
