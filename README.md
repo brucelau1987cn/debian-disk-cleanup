@@ -26,6 +26,28 @@ Debian 10/11/12 一键磁盘清理脚本，适合 VPS、长期运行的 Debian �
 - `--prune-docker`：执行 `docker system prune -a`
 - `--prune-volumes`：连 Docker volumes 一起清理
 
+## 一键复制粘贴使用
+
+安全默认清理，适合先跑一遍：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/brucelau1987cn/debian-disk-cleanup/main/debian-disk-cleanup.sh -o debian-disk-cleanup.sh && chmod +x debian-disk-cleanup.sh && sudo ./debian-disk-cleanup.sh --yes
+```
+
+先预览将要执行的操作：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/brucelau1987cn/debian-disk-cleanup/main/debian-disk-cleanup.sh -o debian-disk-cleanup.sh && chmod +x debian-disk-cleanup.sh && sudo ./debian-disk-cleanup.sh --dry-run
+```
+
+小盘 VPS 强清理，适合 5G/10G 小硬盘抢空间：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/brucelau1987cn/debian-disk-cleanup/main/debian-disk-cleanup.sh -o debian-disk-cleanup.sh && chmod +x debian-disk-cleanup.sh && sudo ./debian-disk-cleanup.sh --yes --journal-size 50M --clear-login-logs --clear-tmp --clear-apt-lists --remove-unused-swap
+```
+
+强清理参数说明：会清空登录审计摘要日志、清理临时目录、删除 APT 软件包索引、删除未启用且未写入 `/etc/fstab` 的 `/swap` 普通文件。后续安装软件前先运行 `sudo apt-get update`。
+
 ## 快速使用
 
 ```bash
