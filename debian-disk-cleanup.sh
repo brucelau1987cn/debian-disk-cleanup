@@ -65,7 +65,7 @@ run_shell() {
 }
 
 require_root() {
-  if [[ "${EUID}" -ne 0 ]]; then
+  if [[ "${EUID}" -ne 0 && "${DEBIAN_DISK_CLEANUP_TEST_ALLOW_NON_ROOT:-0}" != "1" ]]; then
     print_error "Please run as root: sudo ./${SCRIPT_NAME}"
     exit 1
   fi

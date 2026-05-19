@@ -24,6 +24,7 @@ def run_script(args, tmp_path, commands=None, input_text=None):
     env = os.environ.copy()
     env["PATH"] = f"{fakebin}:{env['PATH']}"
     env["COMMAND_LOG"] = str(log)
+    env["DEBIAN_DISK_CLEANUP_TEST_ALLOW_NON_ROOT"] = "1"
     result = subprocess.run(
         ["bash", str(SCRIPT), *args],
         input=input_text,

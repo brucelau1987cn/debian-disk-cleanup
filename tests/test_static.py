@@ -9,6 +9,7 @@ def test_has_strict_mode_and_root_guard():
     assert "set -Eeuo pipefail" in SCRIPT
     assert "require_root" in SCRIPT
     assert "${EUID}" in SCRIPT
+    assert "DEBIAN_DISK_CLEANUP_TEST_ALLOW_NON_ROOT" in SCRIPT
 
 
 def test_destructive_operations_require_flags():
