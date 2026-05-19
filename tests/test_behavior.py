@@ -49,6 +49,11 @@ BASE_COMMANDS = {
         echo "apt-get $*" >> "$COMMAND_LOG"
         exit 0
     """,
+    "dpkg": """
+        #!/usr/bin/env bash
+        echo "dpkg $*" >> "$COMMAND_LOG"
+        exit 0
+    """,
     "journalctl": """
         #!/usr/bin/env bash
         echo "journalctl $*" >> "$COMMAND_LOG"
@@ -93,6 +98,7 @@ def test_dry_run_safe_defaults_do_not_execute_destructive_commands(tmp_path):
     result, log = run_script(["--dry-run"], tmp_path, BASE_COMMANDS)
     assert result.returncode == 0, result.stderr + result.stdout
     assert "[DRY-RUN] apt-get clean" in result.stdout
+    assert "[DRY-RUN] dpkg --configure -a" in result.stdout
     assert "[DRY-RUN] apt-get purge -y linux-image-6.1.0-old-amd64" in result.stdout
     assert "[DRY-RUN] apt-get purge -y linux-image-6.1.0-current-amd64" not in result.stdout
     assert "docker system prune" not in result.stdout
@@ -157,3 +163,18 @@ def test_kernel_cleanup_ignores_removed_config_only_packages(tmp_path):
     assert result.returncode == 0, result.stderr + result.stdout
     assert "[DRY-RUN] apt-get purge -y linux-image-6.1.0-18-cloud-amd64" in result.stdout
     assert "[DRY-RUN] apt-get purge -y linux-image-6.1.0-18-cloud-amd64-unsigned" not in result.stdout
+
+
+def test_dpkg_preflight_runs_before_apt_cleanup(tmp_path):
+    result, log = run_script(["--yes"], tmp_path, BASE_COMMANDS)
+    assert result.returncode == 0, result.stderr + result.stdout
+    dpkg_index = log.index("dpkg --configure -a")
+    apt_index = log.index("apt-get clean")
+    assert dpkg_index < apt_index
+
+
+def test_skip_dpkg_repair_flag_skips_preflight(tmp_path):
+    result, log = run_script(["--yes", "--skip-dpkg-repair"], tmp_path, BASE_COMMANDS)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "dpkg --configure -a" not in log
+    assert "Skipping dpkg preflight repair" in result.stdout

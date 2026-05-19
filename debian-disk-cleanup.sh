@@ -14,6 +14,7 @@ PRUNE_DOCKER_VOLUMES=0
 CLEAR_LOGIN_LOGS=0
 CLEAR_USER_CACHES=0
 CLEAR_TMP=0
+SKIP_DPKG_REPAIR=0
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -37,6 +38,7 @@ Options:
       --clear-login-logs    Truncate /var/log/btmp and /var/log/wtmp.
       --clear-user-caches   Delete /root/.cache and /home/*/.cache contents.
       --clear-tmp           Delete files under /tmp and /var/tmp.
+      --skip-dpkg-repair    Skip automatic 'dpkg --configure -a' preflight repair.
   -h, --help                Show this help.
 
 Safe defaults clean APT cache, orphaned APT packages, old rotated logs,
@@ -94,6 +96,7 @@ parse_args() {
       --clear-login-logs) CLEAR_LOGIN_LOGS=1; shift ;;
       --clear-user-caches) CLEAR_USER_CACHES=1; shift ;;
       --clear-tmp) CLEAR_TMP=1; shift ;;
+      --skip-dpkg-repair) SKIP_DPKG_REPAIR=1; shift ;;
       -h|--help) usage; exit 0 ;;
       *) print_error "Unknown option: $1"; usage; exit 2 ;;
     esac
@@ -102,6 +105,16 @@ parse_args() {
 
 show_disk() {
   df -h /
+}
+
+apt_preflight() {
+  if (( SKIP_DPKG_REPAIR )); then
+    print_warn "Skipping dpkg preflight repair."
+    return 0
+  fi
+
+  print_info "Checking dpkg package database state..."
+  run dpkg --configure -a
 }
 
 apt_cleanup() {
@@ -246,6 +259,7 @@ main() {
 
   confirm
 
+  apt_preflight
   apt_cleanup
   journal_cleanup
   log_cleanup

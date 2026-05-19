@@ -57,3 +57,10 @@ def test_snap_pipeline_is_tolerant_under_pipefail():
 def test_kernel_cleanup_only_targets_installed_packages():
     assert "${db:Status-Abbrev} ${Package}" in SCRIPT
     assert "awk '$1 ~ /^ii/ {print $2}'" in SCRIPT
+
+
+def test_dpkg_preflight_exists_before_apt_cleanup_call():
+    assert "apt_preflight()" in SCRIPT
+    assert "run dpkg --configure -a" in SCRIPT
+    assert "--skip-dpkg-repair" in SCRIPT
+    assert SCRIPT.index("apt_preflight") < SCRIPT.index("apt_cleanup")
