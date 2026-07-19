@@ -155,6 +155,13 @@ def test_dry_run_safe_defaults_do_not_execute_destructive_commands(tmp_path):
 
 
 def test_explicit_destructive_flags_are_visible_in_dry_run(tmp_path):
+    cache_dir = tmp_path / "root-cache"
+    cache_dir.mkdir()
+    script = tmp_path / "debian-disk-cleanup-cache.sh"
+    content = SCRIPT.read_text()
+    content = content.replace("/root/.cache", str(cache_dir))
+    content = content.replace("/home/*/.cache", str(tmp_path / "missing-home" / "*" / ".cache"))
+    script.write_text(content)
     result, log = run_script(
         [
             "--dry-run",
@@ -172,10 +179,11 @@ def test_explicit_destructive_flags_are_visible_in_dry_run(tmp_path):
         ],
         tmp_path,
         BASE_COMMANDS,
+        script=script,
     )
     assert result.returncode == 0, result.stderr + result.stdout
     assert "find /tmp /var/tmp" in result.stdout
-    assert "/root/.cache" in result.stdout
+    assert str(cache_dir) in result.stdout
     assert "find /var/lib/apt/lists" in result.stdout
     assert "mkdir -p /var/lib/apt/lists/partial" in result.stdout
     assert "docker system prune -a --volumes -f" in result.stdout
