@@ -328,6 +328,19 @@ def test_playwright_cleanup_executes_only_when_requested(tmp_path):
     assert "playwright uninstall --all" in log
 
 
+def test_user_cache_cleanup_succeeds_when_no_cache_directories_exist(tmp_path):
+    script = tmp_path / "debian-disk-cleanup-no-cache.sh"
+    content = SCRIPT.read_text()
+    content = content.replace("/root/.cache", str(tmp_path / "missing-root-cache"))
+    content = content.replace("/home/*/.cache", str(tmp_path / "missing-home" / "*" / ".cache"))
+    script.write_text(content)
+    result, _ = run_script(
+        ["--yes", "--clear-user-caches"], tmp_path, BASE_COMMANDS, script=script
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "No user cache directories found" in result.stdout
+
+
 def test_tmp_cleanup_skips_deletion_when_mount_inspection_fails(tmp_path):
     commands = dict(BASE_COMMANDS)
     commands["findmnt"] = """

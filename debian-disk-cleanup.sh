@@ -348,7 +348,11 @@ user_cache_cleanup() {
     for cache_dir in /home/*/.cache; do
       [[ -d "$cache_dir" ]] && cache_dirs+=("$cache_dir")
     done
-    (( ${#cache_dirs[@]} > 0 )) && safe_delete_tree_contents "${cache_dirs[@]}"
+    if (( ${#cache_dirs[@]} > 0 )); then
+      safe_delete_tree_contents "${cache_dirs[@]}"
+    else
+      print_info "No user cache directories found."
+    fi
   else
     print_warn "Skipping user cache cleanup. Use --clear-user-caches to enable."
   fi
