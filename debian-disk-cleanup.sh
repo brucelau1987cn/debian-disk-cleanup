@@ -262,10 +262,6 @@ unused_swap_cleanup() {
 
   local swap_file="/swap"
   local fstab_file="/etc/fstab"
-  if [[ "${DEBIAN_DISK_CLEANUP_TEST_ALLOW_NON_ROOT:-0}" == "1" ]]; then
-    swap_file="${DEBIAN_DISK_CLEANUP_TEST_SWAP_FILE:-$swap_file}"
-    fstab_file="${DEBIAN_DISK_CLEANUP_TEST_FSTAB:-$fstab_file}"
-  fi
   if [[ ! -f "$swap_file" ]]; then
     print_info "No ${swap_file} file found."
     return 0

@@ -18,7 +18,7 @@ def make_fakebin(tmp_path, commands):
     return fakebin, log
 
 
-def run_script(args, tmp_path, commands=None, input_text=None, env_overrides=None):
+def run_script(args, tmp_path, commands=None, input_text=None, env_overrides=None, script=None):
     commands = commands or {}
     fakebin, log = make_fakebin(tmp_path, commands)
     env = os.environ.copy()
@@ -28,7 +28,7 @@ def run_script(args, tmp_path, commands=None, input_text=None, env_overrides=Non
     if env_overrides:
         env.update(env_overrides)
     result = subprocess.run(
-        ["bash", str(SCRIPT), *args],
+        ["bash", str(script or SCRIPT), *args],
         input=input_text,
         text=True,
         stdout=subprocess.PIPE,
@@ -37,6 +37,16 @@ def run_script(args, tmp_path, commands=None, input_text=None, env_overrides=Non
         timeout=20,
     )
     return result, log.read_text() if log.exists() else ""
+
+
+def make_swap_test_script(tmp_path, swap_file, fstab_file=None):
+    script = tmp_path / "debian-disk-cleanup-test.sh"
+    content = SCRIPT.read_text()
+    content = content.replace('local swap_file="/swap"', f'local swap_file="{swap_file}"')
+    if fstab_file is not None:
+        content = content.replace('local fstab_file="/etc/fstab"', f'local fstab_file="{fstab_file}"')
+    script.write_text(content)
+    return script
 
 
 BASE_COMMANDS = {
@@ -200,11 +210,12 @@ def test_clear_apt_lists_requires_explicit_flag(tmp_path):
 def test_remove_unused_swap_requires_explicit_flag_and_safety_checks(tmp_path):
     swap_file = tmp_path / "swap"
     swap_file.write_bytes(b"0")
+    script = make_swap_test_script(tmp_path, swap_file)
     result, _ = run_script(
         ["--dry-run", "--remove-unused-swap"],
         tmp_path,
         BASE_COMMANDS,
-        env_overrides={"DEBIAN_DISK_CLEANUP_TEST_SWAP_FILE": str(swap_file)},
+        script=script,
     )
     assert result.returncode == 0, result.stderr + result.stdout
     assert f"[DRY-RUN] rm -f {swap_file}" in result.stdout
@@ -214,17 +225,19 @@ def test_active_swap_file_is_not_removed(tmp_path):
     commands = dict(BASE_COMMANDS)
     swap_file = tmp_path / "swap"
     swap_file.write_bytes(b"0")
+    script = make_swap_test_script(tmp_path, swap_file)
     commands["swapon"] = """
         #!/usr/bin/env bash
         echo "swapon $*" >> "$COMMAND_LOG"
-        echo "$DEBIAN_DISK_CLEANUP_TEST_SWAP_FILE"
+        echo "$TEST_SWAP_FILE"
         exit 0
     """
     result, _ = run_script(
         ["--dry-run", "--remove-unused-swap"],
         tmp_path,
         commands,
-        env_overrides={"DEBIAN_DISK_CLEANUP_TEST_SWAP_FILE": str(swap_file)},
+        env_overrides={"TEST_SWAP_FILE": str(swap_file)},
+        script=script,
     )
     assert result.returncode == 0, result.stderr + result.stdout
     assert f"[DRY-RUN] rm -f {swap_file}" not in result.stdout
@@ -236,14 +249,12 @@ def test_fstab_swap_file_is_not_removed(tmp_path):
     swap_file.write_bytes(b"0")
     fstab = tmp_path / "fstab"
     fstab.write_text(f"{swap_file} none swap sw 0 0\n")
+    script = make_swap_test_script(tmp_path, swap_file, fstab)
     result, _ = run_script(
         ["--dry-run", "--remove-unused-swap"],
         tmp_path,
         BASE_COMMANDS,
-        env_overrides={
-            "DEBIAN_DISK_CLEANUP_TEST_SWAP_FILE": str(swap_file),
-            "DEBIAN_DISK_CLEANUP_TEST_FSTAB": str(fstab),
-        },
+        script=script,
     )
     assert result.returncode == 0, result.stderr + result.stdout
     assert f"[DRY-RUN] rm -f {swap_file}" not in result.stdout
