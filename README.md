@@ -83,7 +83,7 @@ curl -fsSL https://raw.githubusercontent.com/brucelau1987cn/debian-disk-cleanup/
 - `--clear-apt-lists`：清理 `/var/lib/apt/lists` 软件包索引
 - `--remove-unused-swap`：删除未启用、未写入 `/etc/fstab` 的 `/swap` 普通文件
 - `--clear-old-logs`：清理 7 天前的非审计轮转日志，保留 audit、wtmp 和 btmp
-- `--clear-python-caches`：为运行脚本的 root 当前环境执行 `uv cache prune` 和 `python3 -m pip cache purge`
+- `--clear-python-caches`：为运行脚本的 root 当前环境执行 `uv cache clean` 和 `python3 -m pip cache purge`
 - `--clear-playwright-browsers`：执行 `playwright uninstall --all`，清除 root 当前环境登记的 Playwright 浏览器
 - `--purge-deborphans`：清理 `deborphan` 报告的孤儿包
 - `--autoremove`：执行 `apt-get autoremove --purge -y`
@@ -111,7 +111,7 @@ Options:
       --clear-apt-lists     Delete /var/lib/apt/lists package indexes.
       --remove-unused-swap  Delete /swap when it is a plain file, inactive, and absent from /etc/fstab.
       --clear-old-logs      Delete non-audit rotated logs older than 7 days.
-      --clear-python-caches Prune uv cache and purge pip cache.
+      --clear-python-caches Clear uv and pip caches.
       --clear-playwright-browsers
                             Uninstall browsers tracked by all Playwright installations for the current user.
       --purge-deborphans    Purge packages reported by deborphan.
@@ -172,7 +172,7 @@ sudo ./debian-disk-cleanup.sh --yes --clear-playwright-browsers
 sudo ./debian-disk-cleanup.sh --dry-run --autoremove
 ```
 
-确认候选包可以删除后，再改用 `--yes --autoremove` 执行。
+此命令会实际调用 APT 的无副作用模拟模式并列出候选包。确认候选包可以删除后，再改用 `--yes --autoremove` 执行。
 
 ## 安全设计
 

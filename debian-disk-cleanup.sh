@@ -48,7 +48,7 @@ Options:
       --clear-apt-lists     Delete /var/lib/apt/lists package indexes.
       --remove-unused-swap  Delete /swap when it is a plain file, inactive, and absent from /etc/fstab.
       --clear-old-logs      Delete non-audit rotated logs older than 7 days.
-      --clear-python-caches Prune uv cache and purge pip cache.
+      --clear-python-caches Clear uv and pip caches.
       --clear-playwright-browsers
                             Uninstall browsers tracked by all Playwright installations for the current user.
       --purge-deborphans    Purge packages reported by deborphan.
@@ -181,7 +181,12 @@ apt_cleanup() {
   run apt-get clean
   run apt-get autoclean
   if (( AUTOREMOVE_PACKAGES )); then
-    run apt-get autoremove --purge -y
+    if (( DRY_RUN )); then
+      print_info "Simulating APT autoremove candidates..."
+      apt-get --simulate autoremove --purge
+    else
+      run apt-get autoremove --purge -y
+    fi
   else
     print_warn "Skipping APT autoremove. Use --autoremove to enable."
   fi
@@ -356,7 +361,7 @@ python_cache_cleanup() {
 
   print_warn "Cleaning Python package caches for the current user..."
   if command -v uv >/dev/null 2>&1; then
-    run uv cache prune || print_warn "uv cache prune failed, continuing."
+    run uv cache clean || print_warn "uv cache clean failed, continuing."
   else
     print_warn "uv not found, skipping uv cache cleanup."
   fi

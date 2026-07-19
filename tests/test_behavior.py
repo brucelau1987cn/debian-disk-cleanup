@@ -155,7 +155,7 @@ def test_dry_run_safe_defaults_do_not_execute_destructive_commands(tmp_path):
 
 
 def test_explicit_destructive_flags_are_visible_in_dry_run(tmp_path):
-    result, _ = run_script(
+    result, log = run_script(
         [
             "--dry-run",
             "--clear-tmp",
@@ -179,11 +179,12 @@ def test_explicit_destructive_flags_are_visible_in_dry_run(tmp_path):
     assert "find /var/lib/apt/lists" in result.stdout
     assert "mkdir -p /var/lib/apt/lists/partial" in result.stdout
     assert "docker system prune -a --volumes -f" in result.stdout
-    assert "uv cache prune" in result.stdout
+    assert "uv cache clean" in result.stdout
     assert "python3 -m pip cache purge" in result.stdout
     assert "playwright uninstall --all" in result.stdout
     assert "apt-get purge -y orphan-lib" in result.stdout
-    assert "apt-get autoremove --purge -y" in result.stdout
+    assert "apt-get --simulate autoremove --purge" in log
+    assert "apt-get autoremove --purge -y" not in result.stdout
 
 
 def test_prune_volumes_requires_prune_docker(tmp_path):
@@ -317,7 +318,7 @@ def test_dpkg_repair_is_skipped_by_default(tmp_path):
 def test_python_cache_cleanup_executes_only_when_requested(tmp_path):
     result, log = run_script(["--yes", "--clear-python-caches"], tmp_path, BASE_COMMANDS)
     assert result.returncode == 0, result.stderr + result.stdout
-    assert "uv cache prune" in log
+    assert "uv cache clean" in log
     assert "python3 -m pip cache purge" in log
 
 
